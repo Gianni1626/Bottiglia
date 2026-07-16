@@ -1,0 +1,13 @@
+{
+  "name": "BottleScan - Stima contenuto bottiglia",
+  "short_name": "BottleScan",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "fullscreen"
+  ],
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "orientation": "portrait"
+}

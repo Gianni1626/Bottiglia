@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#020617">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BottleScan">
+<link rel="manifest" href="manifest.webmanifest">
+<title>BottleScan</title>
+<style>
+:root{
+  --bg:#020617;--panel:#0f172a;--panel2:#111827;--text:#f8fafc;
+  --muted:#94a3b8;--accent:#0ea5e9;--ok:#10b981;--border:rgba(255,255,255,.14)
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);
+  color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+}
+body{
+  min-height:100dvh;
+  padding-top:env(safe-area-inset-top);
+  padding-right:env(safe-area-inset-right);
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+}
+.app{
+  height:100%;width:100%;display:grid;
+  grid-template-rows:minmax(210px,40dvh) auto minmax(0,1fr);
+  overflow:hidden;background:var(--bg);
+}
+.camera{
+  position:relative;min-height:0;overflow:hidden;background:#000;
+}
+video,#photo{
+  width:100%;height:100%;display:block;object-fit:contain;background:#000;
+}
+#overlay{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.guide{
+  position:absolute;left:20%;right:20%;top:6%;bottom:6%;
+  border:2px dashed rgba(56,189,248,.78);
+  border-radius:24% 24% 13% 13%/8% 8% 5% 5%;
+  pointer-events:none
+}
+.guide span{
+  position:absolute;left:50%;top:7px;transform:translateX(-50%);
+  white-space:nowrap;font-size:11px;background:rgba(2,6,23,.72);
+  padding:4px 8px;border-radius:999px
+}
+.status{
+  position:absolute;left:8px;right:8px;top:8px;text-align:center;
+  font-size:11px;padding:5px 8px;border-radius:999px;background:rgba(2,6,23,.62);
+  pointer-events:none
+}
+.result{
+  position:absolute;left:9px;bottom:9px;padding:7px 10px;border-radius:13px;
+  background:rgba(2,6,23,.78);border:1px solid var(--border);backdrop-filter:blur(8px)
+}
+.result strong{display:block;font-size:23px;line-height:1}
+.result span{font-size:10px;color:#cbd5e1}
+.controls{
+  display:grid;grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:5px;padding:7px;background:var(--panel);border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border)
+}
+button,.fileBtn{
+  min-width:0;min-height:48px;border:1px solid var(--border);border-radius:11px;
+  background:#1e293b;color:white;font-weight:750;font-size:10px;line-height:1.05;
+  display:flex;align-items:center;justify-content:center;text-align:center;padding:5px 2px
+}
+button:disabled{opacity:.38}
+.fileBtn input{display:none}
+#captureBtn{
+  background:white;color:#020617;border:4px solid rgba(14,165,233,.85);
+  border-radius:50%;width:48px;height:48px;min-height:48px;justify-self:center;padding:0;font-size:0
+}
+#captureBtn:after{
+  content:"";width:29px;height:29px;border-radius:50%;border:2px solid #020617
+}
+.settings{
+  min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--panel2);padding:9px 12px 18px;
+}
+.settings h2{font-size:14px;margin:0 0 8px}
+.field{margin-bottom:8px}
+label{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#cbd5e1;margin-bottom:3px}
+input[type=range]{width:100%;height:24px;margin:0}
+input[type=number],select{
+  width:100%;padding:8px;border-radius:9px;border:1px solid var(--border);
+  background:#0f172a;color:white;font-size:16px
+}
+.capacityRow{display:grid;grid-template-columns:1fr 88px;gap:7px;margin-bottom:8px}
+.note{font-size:10px;color:var(--muted);line-height:1.35;margin-top:6px}
+.hidden{display:none!important}
+.installHint{
+  position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));
+  z-index:50;background:#0f172a;border:1px solid var(--border);border-radius:14px;
+  padding:11px;font-size:12px;line-height:1.35;display:none
+}
+.installHint.show{display:block}
+.installHint button{min-height:36px;width:100%;margin-top:7px}
+
+/* Portrait is the primary and supported iPhone layout. */
+@media (orientation:portrait) and (max-width:500px){
+  .app{grid-template-rows:minmax(200px,38dvh) 62px minmax(0,1fr)}
+  .controls{align-items:center}
+}
+/* Small iPhones: preserve controls and sliders by reducing camera height. */
+@media (orientation:portrait) and (max-height:700px){
+  .app{grid-template-rows:minmax(175px,33dvh) 58px minmax(0,1fr)}
+  button,.fileBtn{min-height:43px;font-size:9px}
+  #captureBtn{width:43px;height:43px;min-height:43px}
+  #captureBtn:after{width:25px;height:25px}
+  .settings{padding-top:7px}
+  .field{margin-bottom:5px}
+  input[type=range]{height:20px}
+}
+/* Landscape remains usable but portrait is recommended. */
+@media (orientation:landscape){
+  .app{grid-template-columns:minmax(0,55%) minmax(300px,45%);grid-template-rows:auto 1fr}
+  .camera{grid-row:1/3}
+  .controls{grid-column:2;grid-row:1;grid-template-columns:repeat(3,1fr)}
+  .settings{grid-column:2;grid-row:2}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="camera" id="stage">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="photo" class="hidden"></canvas>
+    <canvas id="overlay"></canvas>
+    <div class="guide" id="guide"><span>Centra la bottiglia</span></div>
+    <div class="status" id="status">Premi “Camera”</div>
+    <div class="result"><strong id="percent">—</strong><span id="amount">Contenuto residuo</span></div>
+  </section>
+
+  <nav class="controls">
+    <button id="startBtn">Camera</button>
+    <button id="captureBtn" disabled aria-label="Scatta"></button>
+    <button id="switchBtn" disabled>Cambia</button>
+    <label class="fileBtn">Foto<input id="fileInput" type="file" accept="image/*" capture="environment"></label>
+    <button id="autoBtn" disabled>Analizza</button>
+    <button id="retryBtn">Nuova</button>
+  </nav>
+
+  <section class="settings">
+    <h2>Regolazione</h2>
+    <div class="capacityRow">
+      <div><label>Capacità</label><input id="capacity" type="number" min="1" value="1000"></div>
+      <div><label>Unità</label><select id="unit"><option value="ml">mL</option><option value="cl">cL</option><option value="l">L</option></select></div>
+    </div>
+    <div class="field"><label><span>Sommità volume utile</span><b id="topVal"></b></label><input id="topRange" type="range" min="2" max="65" value="16"></div>
+    <div class="field"><label><span>Livello liquido</span><b id="levelVal"></b></label><input id="levelRange" type="range" min="5" max="95" value="52"></div>
+    <div class="field"><label><span>Fondo volume utile</span><b id="bottomVal"></b></label><input id="bottomRange" type="range" min="35" max="99" value="92"></div>
+    <div class="field"><label><span>Margine sinistro</span><b id="leftVal"></b></label><input id="leftRange" type="range" min="1" max="48" value="30"></div>
+    <div class="field"><label><span>Margine destro</span><b id="rightVal"></b></label><input id="rightRange" type="range" min="52" max="99" value="70"></div>
+    <div class="note">Su iPhone verticale la telecamera resta in alto, i pulsanti al centro e gli slider scorrono solo nella parte inferiore.</div>
+  </section>
+</div>
+
+<div class="installHint" id="installHint">
+  Per aprire senza le barre di Safari: Condividi → <b>Aggiungi alla schermata Home</b>.
+  <button id="closeHint">Chiudi</button>
+</div>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const video=$('video'),photo=$('photo'),overlay=$('overlay'),stage=$('stage');
+const pctx=photo.getContext('2d',{willReadFrequently:true}),octx=overlay.getContext('2d');
+const guide=$('guide'),status=$('status'),percent=$('percent'),amount=$('amount');
+const startBtn=$('startBtn'),captureBtn=$('captureBtn'),switchBtn=$('switchBtn');
+const fileInput=$('fileInput'),autoBtn=$('autoBtn'),retryBtn=$('retryBtn');
+const capacity=$('capacity'),unit=$('unit'),topRange=$('topRange'),levelRange=$('levelRange');
+const bottomRange=$('bottomRange'),leftRange=$('leftRange'),rightRange=$('rightRange');
+const installHint=$('installHint'),closeHint=$('closeHint');
+let stream=null,facing='environment',imageReady=false;
+
+function standalone(){return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}
+function setStatus(t){status.textContent=t}
+async function startCamera(){
+  try{
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}},audio:false
+    });
+    video.srcObject=stream;await video.play();
+    video.classList.remove('hidden');photo.classList.add('hidden');guide.classList.remove('hidden');
+    imageReady=false;captureBtn.disabled=false;switchBtn.disabled=false;autoBtn.disabled=true;
+    setStatus('Telecamera attiva');resizeOverlay()
+  }catch(e){setStatus('Controlla il permesso fotocamera')}
+}
+function capture(){
+  if(!video.videoWidth)return;
+  photo.width=video.videoWidth;photo.height=video.videoHeight;
+  pctx.drawImage(video,0,0,photo.width,photo.height);
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  video.classList.add('hidden');photo.classList.remove('hidden');guide.classList.add('hidden');
+  imageReady=true;captureBtn.disabled=true;autoBtn.disabled=false;setStatus('Foto acquisita');
+  resizeOverlay();autoAnalyze()
+}
+function loadFile(file){
+  if(!file)return;
+  const img=new Image();
+  img.onload=()=>{
+    const m=1800,s=Math.min(1,m/Math.max(img.width,img.height));
+    photo.width=Math.round(img.width*s);photo.height=Math.round(img.height*s);
+    pctx.drawImage(img,0,0,photo.width,photo.height);
+    video.classList.add('hidden');photo.classList.remove('hidden');guide.classList.add('hidden');
+    imageReady=true;captureBtn.disabled=true;autoBtn.disabled=false;
+    resizeOverlay();autoAnalyze();URL.revokeObjectURL(img.src)
+  };
+  img.src=URL.createObjectURL(file)
+}
+function resizeOverlay(){
+  const r=stage.getBoundingClientRect(),d=devicePixelRatio||1;
+  overlay.width=Math.round(r.width*d);overlay.height=Math.round(r.height*d);
+  drawOverlay()
+}
+function drawOverlay(){
+  const d=devicePixelRatio||1,W=overlay.width/d,H=overlay.height/d;
+  octx.setTransform(d,0,0,d,0,0);octx.clearRect(0,0,W,H);
+  if(!imageReady)return;
+  const t=H*(+topRange.value/100),l=H*(+levelRange.value/100),b=H*(+bottomRange.value/100);
+  const x1=W*(+leftRange.value/100),x2=W*(+rightRange.value/100);
+  const line=(a,c,e,f,g)=>{octx.strokeStyle=g;octx.lineWidth=2;octx.beginPath();octx.moveTo(a,c);octx.lineTo(e,f);octx.stroke()};
+  line(x1,t,x2,t,'#38bdf8');line(x1,l,x2,l,'#34d399');line(x1,b,x2,b,'#fbbf24');
+  line(x1,t,x1,b,'#fb7185');line(x2,t,x2,b,'#fb7185');
+  octx.fillStyle='rgba(52,211,153,.13)';octx.fillRect(x1,l,x2-x1,b-l)
+}
+function autoAnalyze(){
+  if(!imageReady)return;
+  const w=photo.width,h=photo.height,data=pctx.getImageData(0,0,w,h).data;
+  const score=new Float64Array(h),xa=Math.floor(w*.25),xb=Math.floor(w*.75);
+  for(let y=Math.floor(h*.2);y<Math.floor(h*.85);y++){
+    let s=0,n=0;
+    for(let x=xa;x<xb;x+=3){
+      const a=((y-2)*w+x)*4,b=((y+2)*w+x)*4;
+      const g1=.299*data[a]+.587*data[a+1]+.114*data[a+2];
+      const g2=.299*data[b]+.587*data[b+1]+.114*data[b+2];
+      s+=Math.abs(g2-g1);n++
+    }
+    score[y]=s/Math.max(1,n)
+  }
+  let ly=Math.floor(h*.52),best=-1;
+  for(let y=Math.floor(h*.28);y<Math.floor(h*.82);y++){
+    const v=score[y]*(1-Math.abs(y/h-.55)*.4);
+    if(v>best){best=v;ly=y}
+  }
+  levelRange.value=Math.round(ly/h*100);calculate();setStatus('Analisi eseguita')
+}
+function fraction(){
+  const t=+topRange.value/100,l=+levelRange.value/100,b=+bottomRange.value/100;
+  if(!(t<l&&l<b))return 0;
+  let total=0,filled=0;
+  for(let i=0;i<500;i++){
+    const y=t+(b-t)*(i+.5)/500,u=(y-t)/(b-t);
+    let wf=u<.12?.42:u<.28?.42+(u-.12)/.16*.58:u>.92?1-(u-.92)/.08*.08:1;
+    const a=wf*wf;total+=a;if(y>=l)filled+=a
+  }
+  return filled/total
+}
+function capMl(){
+  const v=Math.max(0,parseFloat(capacity.value)||0);
+  return unit.value==='ml'?v:unit.value==='cl'?v*10:v*1000
+}
+function formatMl(v){
+  return unit.value==='ml'?Math.round(v)+' mL':unit.value==='cl'?(v/10).toFixed(1).replace('.',',')+' cL':(v/1000).toFixed(2).replace('.',',')+' L'
+}
+function updateLabels(){
+  $('topVal').textContent=topRange.value+'%';$('levelVal').textContent=levelRange.value+'%';
+  $('bottomVal').textContent=bottomRange.value+'%';$('leftVal').textContent=leftRange.value+'%';$('rightVal').textContent=rightRange.value+'%'
+}
+function calculate(){
+  updateLabels();drawOverlay();
+  if(!imageReady){percent.textContent='—';amount.textContent='Contenuto residuo';return}
+  const f=fraction();percent.textContent=Math.round(f*100)+'%';amount.textContent=formatMl(capMl()*f)+' residui'
+}
+startBtn.onclick=startCamera;captureBtn.onclick=capture;
+switchBtn.onclick=()=>{facing=facing==='environment'?'user':'environment';startCamera()};
+fileInput.onchange=e=>loadFile(e.target.files[0]);autoBtn.onclick=autoAnalyze;retryBtn.onclick=startCamera;
+[topRange,levelRange,bottomRange,leftRange,rightRange,capacity,unit].forEach(el=>el.addEventListener('input',calculate));
+window.addEventListener('resize',resizeOverlay);window.addEventListener('orientationchange',()=>setTimeout(resizeOverlay,250));
+closeHint.onclick=()=>{installHint.classList.remove('show');localStorage.setItem('hideHintPortrait','1')};
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+if(!standalone()&&!localStorage.getItem('hideHintPortrait'))setTimeout(()=>installHint.classList.add('show'),900);
+updateLabels();resizeOverlay()
+})();
+</script>
+</body>
+</html>
