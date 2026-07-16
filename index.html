@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#020617">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BottleScan">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>BottleScan</title>
+  <style>
+    :root{
+      --bg:#020617;--panel:#0f172a;--panel2:#111827;--text:#f8fafc;
+      --muted:#94a3b8;--line:rgba(255,255,255,.14);--accent:#0ea5e9;--ok:#10b981;
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;overflow:hidden;overscroll-behavior:none}
+    body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    button,input,select{font:inherit}
+
+    .app{height:100%;display:grid;grid-template-rows:minmax(220px,42dvh) auto minmax(0,1fr);background:var(--bg)}
+    .cameraPane{position:relative;min-height:0;background:#000;overflow:hidden;border-bottom:1px solid var(--line)}
+    video,#photo{width:100%;height:100%;display:block;object-fit:contain;background:#000}
+    #overlay{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+    .guide{position:absolute;left:22%;right:18%;top:6%;bottom:6%;border:2px dashed rgba(56,189,248,.8);border-radius:24% 24% 14% 14%/8% 8% 5% 5%;pointer-events:none}
+    .guide span{position:absolute;left:50%;top:8px;transform:translateX(-50%);font-size:11px;white-space:nowrap;padding:4px 7px;border-radius:999px;background:rgba(2,6,23,.72)}
+    .status{position:absolute;left:10px;right:10px;top:8px;text-align:center;font-size:11px;padding:6px 9px;border-radius:999px;background:rgba(2,6,23,.66);pointer-events:none}
+    .result{position:absolute;left:10px;bottom:10px;padding:8px 11px;border:1px solid var(--line);border-radius:14px;background:rgba(2,6,23,.78);backdrop-filter:blur(8px)}
+    .result strong{display:block;font-size:23px;line-height:1}.result span{font-size:11px;color:#cbd5e1}
+
+    .quickBar{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:7px;background:var(--panel);border-bottom:1px solid var(--line)}
+    .quickBar button,.fileBtn{min-width:0;min-height:48px;border:1px solid var(--line);border-radius:12px;background:#1e293b;color:white;font-weight:750;font-size:10px;line-height:1.15;padding:5px 3px;display:flex;align-items:center;justify-content:center;text-align:center}
+    .quickBar button:disabled{opacity:.4}.fileBtn input{display:none}
+    #captureBtn{background:var(--ok);font-size:12px}
+    #startBtn{background:var(--accent)}
+
+    .controls{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:linear-gradient(180deg,var(--panel2),var(--bg));padding:10px 12px calc(14px + env(safe-area-inset-bottom))}
+    .controlsInner{max-width:680px;margin:0 auto}
+    .topRow{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:8px}
+    label{display:block;margin:10px 0 4px;color:#cbd5e1;font-size:12px}
+    input[type=number],select{width:100%;height:40px;border:1px solid var(--line);border-radius:10px;background:#0f172a;color:white;padding:8px 10px;font-size:16px}
+    input[type=range]{width:100%;height:30px;margin:0;accent-color:var(--accent)}
+    .sliderGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+    .note{margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.35}
+    .installHint{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:50;background:#0f172a;border:1px solid var(--line);border-radius:16px;padding:12px;font-size:12px;line-height:1.4;display:none}.installHint.show{display:block}.installHint button{margin-top:8px;min-height:36px;border:1px solid var(--line);border-radius:10px;background:#1e293b;color:white}
+    .hidden{display:none!important}
+
+    @media(max-width:390px){
+      .app{grid-template-rows:minmax(190px,38dvh) auto minmax(0,1fr)}
+      .quickBar{gap:4px;padding:5px}.quickBar button,.fileBtn{min-height:44px;font-size:9px;border-radius:10px}
+      .controls{padding:7px 10px calc(12px + env(safe-area-inset-bottom))}
+      .sliderGrid{gap:0 8px}
+    }
+    @media(orientation:landscape) and (max-height:520px){
+      .app{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto 1fr}
+      .cameraPane{grid-row:1/3;grid-column:1}.quickBar{grid-column:2;grid-row:1;grid-template-columns:repeat(3,1fr)}
+      .controls{grid-column:2;grid-row:2}.sliderGrid{grid-template-columns:1fr}.guide{left:20%;right:16%}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <main class="cameraPane" id="stage">
+    <video id="video" playsinline autoplay muted></video>
+    <canvas id="photo" class="hidden"></canvas>
+    <canvas id="overlay"></canvas>
+    <div class="guide" id="guide"><span>Centra la bottiglia</span></div>
+    <div class="status" id="status">Premi “Attiva”</div>
+    <div class="result"><strong id="percent">—</strong><span id="amount">Contenuto residuo</span></div>
+  </main>
+
+  <nav class="quickBar">
+    <button id="startBtn">Attiva<br>camera</button>
+    <button id="captureBtn" disabled>Scatta</button>
+    <button id="switchBtn" disabled>Cambia<br>camera</button>
+    <label class="fileBtn">Carica<br>foto<input id="fileInput" type="file" accept="image/*" capture="environment"></label>
+    <button id="autoBtn" disabled>Analisi<br>auto</button>
+    <button id="retryBtn">Nuova<br>foto</button>
+  </nav>
+
+  <section class="controls">
+    <div class="controlsInner">
+      <div class="topRow">
+        <div><label for="capacity">Capacità bottiglia</label><input id="capacity" type="number" min="1" step="1" value="1000"></div>
+        <div><label for="unit">Unità</label><select id="unit"><option value="ml">mL</option><option value="cl">cL</option><option value="l">L</option></select></div>
+      </div>
+      <div class="sliderGrid">
+        <div><label>Sommità volume utile</label><input id="topRange" type="range" min="2" max="65" value="16"></div>
+        <div><label>Livello del liquido</label><input id="levelRange" type="range" min="5" max="95" value="52"></div>
+        <div><label>Fondo volume utile</label><input id="bottomRange" type="range" min="35" max="99" value="92"></div>
+        <div><label>Margine sinistro</label><input id="leftRange" type="range" min="1" max="48" value="30"></div>
+        <div><label>Margine destro</label><input id="rightRange" type="range" min="52" max="99" value="70"></div>
+      </div>
+      <p class="note">I pulsanti restano sempre visibili. La parte inferiore con gli slider può scorrere separatamente senza spostare la telecamera.</p>
+    </div>
+  </section>
+</div>
+
+<div class="installHint" id="installHint">Per usare tutto lo schermo su iPhone: Condividi → <b>Aggiungi alla schermata Home</b>, quindi apri BottleScan dalla nuova icona.<br><button id="closeHint">Ho capito</button></div>
+
+<script>
+(()=>{
+ const $=id=>document.getElementById(id),video=$('video'),photo=$('photo'),overlay=$('overlay'),stage=$('stage'),guide=$('guide');
+ const pctx=photo.getContext('2d',{willReadFrequently:true}),octx=overlay.getContext('2d');
+ const status=$('status'),percent=$('percent'),amount=$('amount'),startBtn=$('startBtn'),captureBtn=$('captureBtn'),switchBtn=$('switchBtn'),fileInput=$('fileInput'),autoBtn=$('autoBtn'),retryBtn=$('retryBtn');
+ const capacity=$('capacity'),unit=$('unit'),topRange=$('topRange'),levelRange=$('levelRange'),bottomRange=$('bottomRange'),leftRange=$('leftRange'),rightRange=$('rightRange');
+ let stream=null,facingMode='environment',imageReady=false,drag=null;
+ const setStatus=t=>status.textContent=t;
+ async function startCamera(){try{if(stream)stream.getTracks().forEach(t=>t.stop());stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingMode},width:{ideal:1920},height:{ideal:1080}},audio:false});video.srcObject=stream;await video.play();video.classList.remove('hidden');photo.classList.add('hidden');guide.classList.remove('hidden');imageReady=false;captureBtn.disabled=false;switchBtn.disabled=false;autoBtn.disabled=true;setStatus('Telecamera attiva');resizeOverlay()}catch(e){setStatus('Permesso fotocamera negato o non disponibile')}}
+ function capture(){if(!video.videoWidth)return;photo.width=video.videoWidth;photo.height=video.videoHeight;pctx.drawImage(video,0,0,photo.width,photo.height);if(stream)stream.getTracks().forEach(t=>t.stop());video.classList.add('hidden');photo.classList.remove('hidden');guide.classList.add('hidden');imageReady=true;captureBtn.disabled=true;autoBtn.disabled=false;setStatus('Foto acquisita');resizeOverlay();autoAnalyze()}
+ function loadFile(file){if(!file)return;const img=new Image();img.onload=()=>{const max=1800,s=Math.min(1,max/Math.max(img.width,img.height));photo.width=Math.round(img.width*s);photo.height=Math.round(img.height*s);pctx.drawImage(img,0,0,photo.width,photo.height);video.classList.add('hidden');photo.classList.remove('hidden');guide.classList.add('hidden');imageReady=true;captureBtn.disabled=true;autoBtn.disabled=false;resizeOverlay();autoAnalyze();URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(file)}
+ function resizeOverlay(){const r=stage.getBoundingClientRect(),d=devicePixelRatio||1;overlay.width=Math.round(r.width*d);overlay.height=Math.round(r.height*d);drawOverlay()}
+ function drawOverlay(){const d=devicePixelRatio||1,W=overlay.width/d,H=overlay.height/d;octx.setTransform(d,0,0,d,0,0);octx.clearRect(0,0,W,H);if(!imageReady)return;const t=H*(+topRange.value/100),l=H*(+levelRange.value/100),b=H*(+bottomRange.value/100),x1=W*(+leftRange.value/100),x2=W*(+rightRange.value/100);const line=(a,b,c,dv,col)=>{octx.strokeStyle=col;octx.lineWidth=2;octx.beginPath();octx.moveTo(a,b);octx.lineTo(c,dv);octx.stroke()};line(x1,t,x2,t,'#38bdf8');line(x1,l,x2,l,'#34d399');line(x1,b,x2,b,'#fbbf24');line(x1,t,x1,b,'#fb7185');line(x2,t,x2,b,'#fb7185');octx.fillStyle='rgba(52,211,153,.13)';octx.fillRect(x1,l,x2-x1,b-l)}
+ function autoAnalyze(){if(!imageReady)return;const w=photo.width,h=photo.height,data=pctx.getImageData(0,0,w,h).data,score=new Float64Array(h),xa=Math.floor(w*.28),xb=Math.floor(w*.72);for(let y=Math.floor(h*.2);y<Math.floor(h*.85);y++){let s=0,n=0;for(let x=xa;x<xb;x+=3){const a=((y-2)*w+x)*4,b=((y+2)*w+x)*4,g1=.299*data[a]+.587*data[a+1]+.114*data[a+2],g2=.299*data[b]+.587*data[b+1]+.114*data[b+2];s+=Math.abs(g2-g1);n++}score[y]=s/Math.max(1,n)}let ly=Math.floor(h*.52),best=-1;for(let y=Math.floor(h*.28);y<Math.floor(h*.82);y++){const v=score[y]*(1-Math.abs(y/h-.55)*.4);if(v>best){best=v;ly=y}}levelRange.value=Math.round(ly/h*100);calculate();setStatus('Analisi eseguita')}
+ function fraction(){const t=+topRange.value/100,l=+levelRange.value/100,b=+bottomRange.value/100;if(!(t<l&&l<b))return 0;let total=0,filled=0;for(let i=0;i<500;i++){const y=t+(b-t)*(i+.5)/500,u=(y-t)/(b-t);let wf=u<.12?.42:u<.28?.42+(u-.12)/.16*.58:u>.92?1-(u-.92)/.08*.08:1;const a=wf*wf;total+=a;if(y>=l)filled+=a}return filled/total}
+ function capMl(){const v=Math.max(0,parseFloat(capacity.value)||0);return unit.value==='ml'?v:unit.value==='cl'?v*10:v*1000}
+ function formatMl(v){return unit.value==='ml'?Math.round(v)+' mL':unit.value==='cl'?(v/10).toFixed(1).replace('.',',')+' cL':(v/1000).toFixed(2).replace('.',',')+' L'}
+ function calculate(){drawOverlay();if(!imageReady){percent.textContent='—';amount.textContent='Contenuto residuo';return}const f=fraction(),v=capMl()*f;percent.textContent=Math.round(f*100)+'%';amount.textContent=formatMl(v)+' residui'}
+ startBtn.onclick=startCamera;captureBtn.onclick=capture;switchBtn.onclick=()=>{facingMode=facingMode==='environment'?'user':'environment';startCamera()};fileInput.onchange=e=>loadFile(e.target.files[0]);autoBtn.onclick=autoAnalyze;retryBtn.onclick=startCamera;
+ [capacity,unit,topRange,levelRange,bottomRange,leftRange,rightRange].forEach(el=>el.addEventListener('input',calculate));window.addEventListener('resize',resizeOverlay);window.addEventListener('orientationchange',()=>setTimeout(resizeOverlay,250));
+ overlay.addEventListener('pointerdown',e=>{if(!imageReady)return;const r=overlay.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*100,y=(e.clientY-r.top)/r.height*100,c=[['top',Math.abs(y-+topRange.value)],['level',Math.abs(y-+levelRange.value)],['bottom',Math.abs(y-+bottomRange.value)],['left',Math.abs(x-+leftRange.value)],['right',Math.abs(x-+rightRange.value)]].sort((a,b)=>a[1]-b[1]);if(c[0][1]<7){drag=c[0][0];overlay.setPointerCapture(e.pointerId)}});
+ overlay.addEventListener('pointermove',e=>{if(!drag)return;const r=overlay.getBoundingClientRect(),x=Math.max(1,Math.min(99,(e.clientX-r.left)/r.width*100)),y=Math.max(2,Math.min(99,(e.clientY-r.top)/r.height*100));if(drag==='top')topRange.value=Math.min(y,+levelRange.value-2);if(drag==='level')levelRange.value=Math.max(+topRange.value+2,Math.min(y,+bottomRange.value-2));if(drag==='bottom')bottomRange.value=Math.max(y,+levelRange.value+2);if(drag==='left')leftRange.value=Math.min(x,+rightRange.value-3);if(drag==='right')rightRange.value=Math.max(x,+leftRange.value+3);calculate()});overlay.addEventListener('pointerup',()=>drag=null);overlay.addEventListener('pointercancel',()=>drag=null);
+ if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;if(!standalone&&!localStorage.getItem('hideInstallHint'))setTimeout(()=>$('installHint').classList.add('show'),1100);$('closeHint').onclick=()=>{$('installHint').classList.remove('show');localStorage.setItem('hideInstallHint','1')};resizeOverlay();
+})();
+</script>
+</body>
+</html>
